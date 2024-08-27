@@ -1,7 +1,7 @@
 import unittest
 import uuid
 
-from mastermind.domain import commands, events, executor, value
+from mastermind.domain import commands, events, game, value
 
 
 def any_game_id() -> value.GameId:
@@ -27,7 +27,8 @@ class TestGameExamples(unittest.TestCase):
         command = commands.JoinGame(
             self.game_id, self.secret, self.total_attempts, self.available_pegs
         )
+        not_started_game = game.NotStartedGame()
 
-        result = executor.execute(command)
+        result = not_started_game.execute(command)
 
         self.assertEqual(result, expected)
