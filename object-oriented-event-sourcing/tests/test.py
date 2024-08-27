@@ -32,3 +32,35 @@ class TestGameExamples(unittest.TestCase):
         result = not_started_game.execute(command)
 
         self.assertEqual(result, expected)
+
+    def test_it_makes_a_guess(self) -> None:
+        entity = TestGameExamples.game_of(
+            events.GameStarted(
+                self.game_id, self.secret, self.total_attempts, self.available_pegs
+            )
+        )
+        command = commands.MakeGuess(
+            self.game_id, value.Code("Purple", "Purple", "Purple", "Purple")
+        )
+
+        result = entity.execute(command)
+
+        self.assertEqual(
+            result,
+            [
+                events.GuessMade(
+                    self.game_id,
+                    value.Guess(
+                        value.Code("Purple", "Purple", "Purple", "Purple"),
+                        value.Feedback(value.Feedback.Outcome.IN_PROGRESS),
+                    ),
+                )
+            ],
+        )
+
+    @staticmethod
+    def game_of(*events: events.GameEvent) -> game.Game:
+        entity = game.NotStartedGame()
+        for event in events:
+            entity = entity.apply_event(event)
+        return entity
