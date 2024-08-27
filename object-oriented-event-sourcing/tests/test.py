@@ -1,7 +1,7 @@
 import unittest
 import uuid
 
-from mastermind.domain import commands, events, game, value
+from mastermind.domain import commands, errors, events, game, value
 
 
 def any_game_id() -> value.GameId:
@@ -138,3 +138,141 @@ class TestGameExamples(unittest.TestCase):
                         ]
                     ),
                 )
+
+    def test_the_game_is_won_if_the_secret_is_guessed(self) -> None:
+        entity = self.game_of(
+            events.GameStarted(
+                self.game_id, self.secret, self.total_attempts, self.available_pegs
+            )
+        )
+        command = commands.MakeGuess(self.game_id, self.secret)
+
+        result = entity.execute(command)
+
+        self.assertEqual(
+            result,
+            [
+                events.GuessMade(
+                    self.game_id,
+                    value.Guess(
+                        self.secret,
+                        value.Feedback(
+                            value.Feedback.Outcome.WON,
+                            value.Feedback.Peg.BLACK,
+                            value.Feedback.Peg.BLACK,
+                            value.Feedback.Peg.BLACK,
+                            value.Feedback.Peg.BLACK,
+                        ),
+                    ),
+                ),
+                events.GameWon(self.game_id),
+            ],
+        )
+
+    def test_the_game_can_no_longer_be_played_once_won(self) -> None:
+        starting_events = [
+            events.GameStarted(
+                self.game_id, self.secret, self.total_attempts, self.available_pegs
+            )
+        ]
+        entity = self.game_of(*starting_events)
+
+        win_command = commands.MakeGuess(self.game_id, self.secret)
+        result = entity.execute(win_command)
+        updated_events = starting_events + result
+        updated_game = self.game_of(*updated_events)
+
+        error = updated_game.execute(commands.MakeGuess(self.game_id, self.secret))
+        self.assertIsInstance(error, errors.GameAlreadyWon)
+
+    def test_the_game_is_lost_if_the_secret_is_not_guessed_within_attempts(
+        self,
+    ) -> None:
+        wrong_code = value.Code("Purple", "Purple", "Purple", "Purple")
+        entity = self.game_of(
+            events.GameStarted(self.game_id, self.secret, 3, self.available_pegs),
+            events.GuessMade(
+                self.game_id,
+                value.Guess(
+                    wrong_code, value.Feedback(value.Feedback.Outcome.IN_PROGRESS)
+                ),
+            ),
+            events.GuessMade(
+                self.game_id,
+                value.Guess(
+                    wrong_code, value.Feedback(value.Feedback.Outcome.IN_PROGRESS)
+                ),
+            ),
+        )
+
+        command = commands.MakeGuess(self.game_id, wrong_code)
+        result = entity.execute(command)
+
+        self.assertEqual(
+            result,
+            [
+                events.GuessMade(
+                    self.game_id,
+                    value.Guess(
+                        wrong_code, value.Feedback(value.Feedback.Outcome.LOST)
+                    ),
+                ),
+                events.GameLost(self.game_id),
+            ],
+        )
+
+    def test_the_game_can_no_longer_be_played_once_lost(self) -> None:
+        wrong_code = value.Code("Purple", "Purple", "Purple", "Purple")
+        starting_events = [
+            events.GameStarted(self.game_id, self.secret, 1, self.available_pegs)
+        ]
+        entity = self.game_of(*starting_events)
+
+        lose_command = commands.MakeGuess(self.game_id, wrong_code)
+        result = entity.execute(lose_command)
+
+        updated_events = starting_events + result
+        updated_game = self.game_of(*updated_events)
+
+        error = updated_game.execute(commands.MakeGuess(self.game_id, self.secret))
+        self.assertIsInstance(error, errors.GameAlreadyLost)
+
+    def test_the_game_cannot_be_played_if_not_started(self) -> None:
+        code = value.Code("Red", "Purple", "Red", "Purple")
+        entity = game.NotStartedGame()
+
+        error = entity.execute(commands.MakeGuess(self.game_id, code))
+        self.assertIsInstance(error, errors.GameNotStarted)
+
+    def test_the_guess_length_cannot_be_shorter_than_the_secret(self) -> None:
+        short_code = value.Code("Purple", "Purple", "Purple")
+        entity = self.game_of(
+            events.GameStarted(
+                self.game_id, self.secret, self.total_attempts, self.available_pegs
+            )
+        )
+
+        error = entity.execute(commands.MakeGuess(self.game_id, short_code))
+        self.assertIsInstance(error, errors.GuessTooShort)
+
+    def test_the_guess_length_cannot_be_longer_than_the_secret(self) -> None:
+        long_code = value.Code("Purple", "Purple", "Purple", "Purple", "Purple")
+        entity = self.game_of(
+            events.GameStarted(
+                self.game_id, self.secret, self.total_attempts, self.available_pegs
+            )
+        )
+
+        error = entity.execute(commands.MakeGuess(self.game_id, long_code))
+        self.assertIsInstance(error, errors.GuessTooLong)
+
+    def test_it_rejects_pegs_that_the_game_was_not_started_with(self) -> None:
+        secret = value.Code("Red", "Green", "Blue", "Blue")
+        limited_pegs = value.set_of_pegs("Red", "Green", "Blue")
+        entity = self.game_of(
+            events.GameStarted(self.game_id, secret, self.total_attempts, limited_pegs)
+        )
+        invalid_guess = value.Code("Red", "Green", "Blue", "Yellow")
+
+        error = entity.execute(commands.MakeGuess(self.game_id, invalid_guess))
+        self.assertIsInstance(error, errors.InvalidPegInGuess)
