@@ -60,10 +60,22 @@ class StartedGame(Game):
     total_attempts: int
     available_pegs: set[value.Code.Peg]
 
-    def apply_event(self, event: events.GameEvent) -> Self:
+    def apply_event(self, _: events.GameEvent) -> Self:
         return self
 
     def execute(
         self, command: commands.GameCommand
     ) -> errors.GameError | NonEmptyList[events.GameEvent]:
+        if isinstance(command, commands.MakeGuess):
+            feedback: value.Feedback = self.__feedback_on(command.guess)
+            return NonEmptyList(
+                [
+                    events.GuessMade(
+                        command.game_id, value.Guess(command.guess, feedback)
+                    )
+                ]
+            )
         return errors.GameError(command.game_id)
+
+    def __feedback_on(self, _: value.Code) -> value.Feedback:
+        return value.Feedback(value.Feedback.Outcome.IN_PROGRESS)

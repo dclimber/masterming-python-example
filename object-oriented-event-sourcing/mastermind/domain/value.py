@@ -1,4 +1,5 @@
 import dataclasses
+import enum
 from typing import Iterable, cast
 
 
@@ -8,7 +9,7 @@ class Code:
     class Peg:
         name: str
 
-    pegs: list[Peg] = dataclasses.field(default_factory=list)
+    pegs: list[Peg]
 
     def __init__(self, *pegs: Peg | str) -> None:
         if all(isinstance(peg, Code.Peg) for peg in pegs):
@@ -34,3 +35,24 @@ class GameId:
     @property
     def value(self) -> str:
         return self.__value
+
+
+@dataclasses.dataclass()
+class Feedback:
+    class Outcome(enum.IntEnum):
+        IN_PROGRESS = 1
+        WON = 2
+        LOST = 3
+
+    class Peg(enum.Enum):
+        BLACK = "Black"
+        WHITE = "White"
+
+    outcome: Outcome
+    pegs: list[Peg] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass()
+class Guess:
+    code: Code
+    feedback: Feedback

@@ -14,3 +14,8 @@ class JoinGame(GameCommand):
     secret: value.Code
     total_attempts: int
     available_pegs: set[value.Code.Peg]
+
+
+@dataclasses.dataclass()
+class MakeGuess(GameCommand):
+    guess: value.Code

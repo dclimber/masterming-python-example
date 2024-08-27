@@ -14,3 +14,8 @@ class GameStarted(GameEvent):
     secret: value.Code
     total_attempts: int
     available_pegs: set[value.Code.Peg]
+
+
+@dataclasses.dataclass(frozen=True, eq=True)
+class GuessMade(GameEvent):
+    guess: value.Guess
