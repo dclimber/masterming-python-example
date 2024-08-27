@@ -60,25 +60,52 @@ class StartedGame(Game):
     total_attempts: int
     available_pegs: set[value.Code.Peg]
 
-    def apply_event(self, _: events.GameEvent) -> Self:
+    def apply_event(self, event: events.GameEvent) -> "Game":
+        if isinstance(event, events.GuessMade):
+            return dataclasses.replace(self, attempts=self.attempts + 1)
+        elif isinstance(event, events.GameWon):
+            return WonGame()
+        elif isinstance(event, events.GameLost):
+            return LostGame()
         return self
 
     def execute(
         self, command: commands.GameCommand
     ) -> errors.GameError | NonEmptyList[events.GameEvent]:
         if isinstance(command, commands.MakeGuess):
+            valid_guess = self.__valid_guess(command.game_id, command.guess)
+            if isinstance(valid_guess, errors.GameError):
+                return valid_guess
 
             feedback = self.__feedback_on(command.guess)
-            result_events = [
-                events.GuessMade(
-                    command.game_id,
-                    value.Guess(command.guess, feedback),
-                )
-            ]
+            result_events = NonEmptyList(
+                [
+                    events.GuessMade(
+                        command.game_id,
+                        value.Guess(command.guess, feedback),
+                    )
+                ]
+            )
+
+            if feedback.outcome == value.Feedback.Outcome.WON:
+                result_events.append(events.GameWon(command.game_id))
+            elif feedback.outcome == value.Feedback.Outcome.LOST:
+                result_events.append(events.GameLost(command.game_id))
 
             return NonEmptyList(result_events)
 
         return errors.GameError(command.game_id)
+
+    def __valid_guess(
+        self, game_id: value.GameId, guess: value.Code
+    ) -> None | errors.GameError:
+        if len(guess.pegs) < len(self.secret.pegs):
+            return errors.GuessTooShort(game_id, guess, len(self.secret.pegs))
+        if len(guess.pegs) > len(self.secret.pegs):
+            return errors.GuessTooLong(game_id, guess, len(self.secret.pegs))
+        if not all(peg in self.available_pegs for peg in guess.pegs):
+            return errors.InvalidPegInGuess(game_id, guess, self.available_pegs)
+        return None
 
     def __feedback_on(self, guess: value.Code) -> value.Feedback:
         # Exact hits (correct color and position)
@@ -124,3 +151,25 @@ class StartedGame(Game):
         ] * len(color_hits)
 
         return value.Feedback(outcome, *feedback_pegs)
+
+
+@dataclasses.dataclass()
+class WonGame(Game):
+    def apply_event(self, _: events.GameEvent) -> Self:
+        return self
+
+    def execute(
+        self, command: commands.GameCommand
+    ) -> errors.GameError | NonEmptyList[events.GameEvent]:
+        return errors.GameAlreadyWon(command.game_id)
+
+
+@dataclasses.dataclass()
+class LostGame(Game):
+    def apply_event(self, _: events.GameEvent) -> Self:
+        return self
+
+    def execute(
+        self, command: commands.GameCommand
+    ) -> errors.GameError | NonEmptyList[events.GameEvent]:
+        return errors.GameAlreadyLost(command.game_id)

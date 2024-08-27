@@ -19,3 +19,13 @@ class GameStarted(GameEvent):
 @dataclasses.dataclass(frozen=True, eq=True)
 class GuessMade(GameEvent):
     guess: value.Guess
+
+
+@dataclasses.dataclass(frozen=True, eq=True)
+class GameWon(GameEvent):
+    pass
+
+
+@dataclasses.dataclass(frozen=True, eq=True)
+class GameLost(GameEvent):
+    pass
