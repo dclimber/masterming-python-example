@@ -28,16 +28,12 @@ def set_of_pegs(*pegs: str) -> set[Code.Peg]:
     return set(Code.Peg(peg) for peg in pegs)
 
 
-class GameId:
-    def __init__(self, value: str) -> None:
-        self.__value: str = value
-
-    @property
-    def value(self) -> str:
-        return self.__value
-
-
 @dataclasses.dataclass()
+class GameId:
+    value: str
+
+
+@dataclasses.dataclass(init=False)
 class Feedback:
     class Outcome(enum.IntEnum):
         IN_PROGRESS = 1
@@ -49,7 +45,11 @@ class Feedback:
         WHITE = "White"
 
     outcome: Outcome
-    pegs: list[Peg] = dataclasses.field(default_factory=list)
+    pegs: list[Peg]
+
+    def __init__(self, outcome: Outcome, *pegs: Peg) -> None:
+        self.outcome = outcome
+        self.pegs = [peg for peg in pegs]
 
 
 @dataclasses.dataclass()

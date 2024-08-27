@@ -67,15 +67,60 @@ class StartedGame(Game):
         self, command: commands.GameCommand
     ) -> errors.GameError | NonEmptyList[events.GameEvent]:
         if isinstance(command, commands.MakeGuess):
-            feedback: value.Feedback = self.__feedback_on(command.guess)
-            return NonEmptyList(
-                [
-                    events.GuessMade(
-                        command.game_id, value.Guess(command.guess, feedback)
-                    )
-                ]
-            )
+
+            feedback = self.__feedback_on(command.guess)
+            result_events = [
+                events.GuessMade(
+                    command.game_id,
+                    value.Guess(command.guess, feedback),
+                )
+            ]
+
+            return NonEmptyList(result_events)
+
         return errors.GameError(command.game_id)
 
-    def __feedback_on(self, _: value.Code) -> value.Feedback:
-        return value.Feedback(value.Feedback.Outcome.IN_PROGRESS)
+    def __feedback_on(self, guess: value.Code) -> value.Feedback:
+        # Exact hits (correct color and position)
+        exact_hits = [
+            peg
+            for peg, secret_peg in zip(guess.pegs, self.secret.pegs)
+            if peg == secret_peg
+        ]
+
+        # Remove exact hits from consideration for color hits
+        remaining_secret_pegs = [
+            secret_peg
+            for secret_peg, peg in zip(self.secret.pegs, guess.pegs)
+            if peg != secret_peg
+        ]
+        remaining_guess_pegs = [
+            peg
+            for peg, secret_peg in zip(guess.pegs, self.secret.pegs)
+            if peg != secret_peg
+        ]
+
+        # Color hits (correct color but wrong position)
+        color_hits = []
+        for peg in remaining_guess_pegs:
+            if peg in remaining_secret_pegs:
+                color_hits.append(peg)
+                remaining_secret_pegs.remove(peg)
+
+        # Determine the game outcome
+        outcome = (
+            value.Feedback.Outcome.WON
+            if len(exact_hits) == len(self.secret.pegs)
+            else (
+                value.Feedback.Outcome.LOST
+                if self.attempts + 1 >= self.total_attempts
+                else value.Feedback.Outcome.IN_PROGRESS
+            )
+        )
+
+        # Convert exact hits and color hits to their corresponding peg feedback
+        feedback_pegs = [value.Feedback.Peg.BLACK] * len(exact_hits) + [
+            value.Feedback.Peg.WHITE
+        ] * len(color_hits)
+
+        return value.Feedback(outcome, *feedback_pegs)
