@@ -24,10 +24,6 @@ class Code:
         return len(self.pegs)
 
 
-def set_of_pegs(*pegs: str) -> set[Code.Peg]:
-    return set(Code.Peg(peg) for peg in pegs)
-
-
 @dataclasses.dataclass()
 class GameId:
     value: str

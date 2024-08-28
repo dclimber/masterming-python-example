@@ -8,13 +8,17 @@ def any_game_id() -> value.GameId:
     return value.GameId(str(uuid.uuid4()))
 
 
+def set_of_pegs(*pegs: str) -> set[value.Code.Peg]:
+    return set(value.Code.Peg(peg) for peg in pegs)
+
+
 class TestGameExamples(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.game_id = any_game_id()
         self.secret = value.Code("Red", "Green", "Blue", "Yellow")
         self.total_attempts = 12
-        self.available_pegs = value.set_of_pegs(
+        self.available_pegs = set_of_pegs(
             "Red", "Green", "Blue", "Yellow", "Purple", "Pink"
         )
 
@@ -268,7 +272,7 @@ class TestGameExamples(unittest.TestCase):
 
     def test_it_rejects_pegs_that_the_game_was_not_started_with(self) -> None:
         secret = value.Code("Red", "Green", "Blue", "Blue")
-        limited_pegs = value.set_of_pegs("Red", "Green", "Blue")
+        limited_pegs = set_of_pegs("Red", "Green", "Blue")
         entity = self.game_of(
             events.GameStarted(self.game_id, secret, self.total_attempts, limited_pegs)
         )
